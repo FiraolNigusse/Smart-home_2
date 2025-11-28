@@ -129,4 +129,21 @@ return [
 
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | External Log Sink Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configure external log sinks for centralized logging. This allows
+    | system logs to be sent to external services or files for backup/analysis.
+    |
+    */
+
+    'external_sink' => [
+        'enabled' => env('EXTERNAL_LOG_SINK_ENABLED', false),
+        'file_path' => env('EXTERNAL_LOG_SINK_FILE', storage_path('logs/external/system.log')),
+        'api_url' => env('EXTERNAL_LOG_SINK_API_URL'),
+        'api_key' => env('EXTERNAL_LOG_SINK_API_KEY'),
+    ],
+
 ];

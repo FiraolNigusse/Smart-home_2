@@ -59,6 +59,14 @@ Route::middleware('forcehttps')->group(function () {
     Route::get('/security/biometrics', [BiometricCredentialController::class, 'index'])->name('security.biometrics.index');
     Route::post('/security/biometrics', [BiometricCredentialController::class, 'store'])->name('security.biometrics.store');
     Route::delete('/security/biometrics/{credential}', [BiometricCredentialController::class, 'destroy'])->name('security.biometrics.destroy');
+
+    // WebAuthn endpoints
+    Route::prefix('api/webauthn')->name('webauthn.')->group(function () {
+        Route::get('/registration/challenge', [\App\Http\Controllers\Auth\WebAuthnController::class, 'registrationChallenge'])->name('registration.challenge');
+        Route::post('/registration', [\App\Http\Controllers\Auth\WebAuthnController::class, 'register'])->name('registration');
+        Route::get('/authentication/challenge', [\App\Http\Controllers\Auth\WebAuthnController::class, 'authenticationChallenge'])->name('authentication.challenge');
+        Route::post('/authentication', [\App\Http\Controllers\Auth\WebAuthnController::class, 'authenticate'])->name('authentication');
+    });
 });
 
 Route::middleware('auth')->group(function () {

@@ -8,8 +8,10 @@ use Illuminate\Support\Facades\Crypt;
 
 class SystemLogService
 {
-    public function __construct(protected AlertService $alertService)
-    {
+    public function __construct(
+        protected AlertService $alertService,
+        protected ExternalLogSink $externalLogSink
+    ) {
     }
 
     public function log(string $eventType, string $severity = 'info', ?User $actor = null, ?string $message = null, array $context = [], array $sensitivePayload = []): SystemLog
@@ -28,7 +30,11 @@ class SystemLogService
             'logged_at' => now(),
         ]);
 
+        // Trigger alert if severity meets threshold
         $this->alertService->notify($severity, $eventType, $message, $context);
+
+        // Send to external log sink if enabled
+        $this->externalLogSink->send($log);
 
         return $log;
     }

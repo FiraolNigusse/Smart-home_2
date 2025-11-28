@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Services\CaptchaService;
 use App\Services\MfaService;
+use App\Services\SessionSecurityService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,6 +17,7 @@ class AuthenticatedSessionController extends Controller
     public function __construct(
         protected CaptchaService $captchaService,
         protected MfaService $mfaService,
+        protected SessionSecurityService $sessionSecurity,
     ) {
     }
 
@@ -56,6 +58,9 @@ class AuthenticatedSessionController extends Controller
         }
 
         $request->session()->regenerate();
+        
+        // Update session metadata
+        $this->sessionSecurity->updateSessionMetadata($request->session()->getId(), $request);
 
         return redirect()->intended(route('dashboard', absolute: false));
     }

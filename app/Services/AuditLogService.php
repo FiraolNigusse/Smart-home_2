@@ -9,6 +9,11 @@ use Illuminate\Http\Request;
 
 class AuditLogService
 {
+    public function __construct(
+        protected SystemLogService $systemLogService
+    ) {
+    }
+
     /**
      * Log an action.
      *
@@ -30,7 +35,7 @@ class AuditLogService
         ?Request $request = null,
         array $metadata = []
     ): AuditLog {
-        return AuditLog::create([
+        $auditLog = AuditLog::create([
             'user_id' => $user?->id,
             'device_id' => $device?->id,
             'action' => $action,
@@ -41,6 +46,29 @@ class AuditLogService
             'metadata' => $metadata,
             'performed_at' => now(),
         ]);
+
+        // Log denied actions to system log with alerting for critical actions
+        if ($status === 'denied') {
+            $criticalActions = ['delete', 'unlock', 'admin_access', 'role_change', 'permission_grant'];
+            $severity = in_array($action, $criticalActions) ? 'warning' : 'info';
+            
+            $this->systemLogService->log(
+                eventType: 'access.denied',
+                severity: $severity,
+                actor: $user,
+                message: "Access denied: {$action} on " . ($device?->name ?? 'system'),
+                context: [
+                    'device_id' => $device?->id,
+                    'device_name' => $device?->name,
+                    'action' => $action,
+                    'denial_reason' => $message,
+                    'ip_address' => $request?->ip(),
+                ],
+                sensitivePayload: $metadata
+            );
+        }
+
+        return $auditLog;
     }
 
     /**

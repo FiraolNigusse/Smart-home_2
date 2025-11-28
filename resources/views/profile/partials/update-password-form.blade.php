@@ -23,6 +23,18 @@
             <x-input-label for="update_password_password" :value="__('New Password')" />
             <x-text-input id="update_password_password" name="password" type="password" class="mt-1 block w-full" autocomplete="new-password" />
             <x-input-error :messages="$errors->updatePassword->get('password')" class="mt-2" />
+            <div class="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                <p class="font-semibold mb-1">{{ __('Password Requirements:') }}</p>
+                <ul class="list-disc list-inside space-y-0.5">
+                    <li>{{ __('Minimum 12 characters') }}</li>
+                    <li>{{ __('At least one uppercase letter') }}</li>
+                    <li>{{ __('At least one lowercase letter') }}</li>
+                    <li>{{ __('At least one number') }}</li>
+                    <li>{{ __('At least one symbol') }}</li>
+                    <li>{{ __('Not found in breached password databases') }}</li>
+                    <li>{{ __('Cannot reuse your last :count passwords', ['count' => config('security.password_policy.history_count', 5)]) }}</li>
+                </ul>
+            </div>
         </div>
 
         <div>

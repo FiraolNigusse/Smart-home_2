@@ -15,24 +15,47 @@
                         </div>
                     @endif
                     <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                        {{ __('Register public keys from compatible biometric devices (WebAuthn, FIDO, etc.).') }}
+                        {{ __('Register biometric devices using WebAuthn/FIDO2. Click "Register Device" to use your browser\'s built-in biometric authentication, or manually enter a public key below.') }}
                     </p>
-                    <form method="POST" action="{{ route('security.biometrics.store') }}" class="space-y-4">
-                        @csrf
-                        <div>
-                            <x-input-label for="name" :value="__('Credential Label')" />
-                            <x-text-input id="name" name="name" type="text" class="block mt-1 w-full" required />
-                            <x-input-error :messages="$errors->get('name')" class="mt-2" />
-                        </div>
-                        <div>
-                            <x-input-label for="public_key" :value="__('Public Key Payload')" />
-                            <textarea id="public_key" name="public_key" rows="4" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300" required></textarea>
-                            <x-input-error :messages="$errors->get('public_key')" class="mt-2" />
-                        </div>
-                        <div class="text-right">
-                            <x-primary-button>{{ __('Save Credential') }}</x-primary-button>
-                        </div>
-                    </form>
+                    
+                    <!-- WebAuthn Registration -->
+                    <div class="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <h4 class="font-semibold text-gray-900 dark:text-gray-100 mb-2">{{ __('WebAuthn Registration') }}</h4>
+                        <p class="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                            {{ __('Use your device\'s biometric authentication (fingerprint, face recognition, etc.) to register.') }}
+                        </p>
+                        <button 
+                            type="button" 
+                            id="webauthn-register-btn"
+                            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm"
+                        >
+                            {{ __('Register Device with WebAuthn') }}
+                        </button>
+                        <div id="webauthn-status" class="mt-2 text-sm"></div>
+                    </div>
+
+                    <!-- Manual Registration (Fallback) -->
+                    <details class="mb-4">
+                        <summary class="cursor-pointer text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
+                            {{ __('Or register manually (Advanced)') }}
+                        </summary>
+                        <form method="POST" action="{{ route('security.biometrics.store') }}" class="space-y-4 mt-4">
+                            @csrf
+                            <div>
+                                <x-input-label for="name" :value="__('Credential Label')" />
+                                <x-text-input id="name" name="name" type="text" class="block mt-1 w-full" required />
+                                <x-input-error :messages="$errors->get('name')" class="mt-2" />
+                            </div>
+                            <div>
+                                <x-input-label for="public_key" :value="__('Public Key Payload (JSON)')" />
+                                <textarea id="public_key" name="public_key" rows="4" class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300" placeholder='{"id":"...","publicKey":"..."}'></textarea>
+                                <x-input-error :messages="$errors->get('public_key')" class="mt-2" />
+                            </div>
+                            <div class="text-right">
+                                <x-primary-button>{{ __('Save Credential Manually') }}</x-primary-button>
+                            </div>
+                        </form>
+                    </details>
                 </div>
             </div>
 
@@ -59,5 +82,72 @@
             </div>
         </div>
     </div>
+
+    @push('scripts')
+    <script>
+        document.getElementById('webauthn-register-btn')?.addEventListener('click', async function() {
+            const statusEl = document.getElementById('webauthn-status');
+            statusEl.textContent = '{{ __("Requesting challenge...") }}';
+            
+            try {
+                // Get registration challenge
+                const challengeResponse = await fetch('{{ route("webauthn.registration.challenge") }}', {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content
+                    },
+                    credentials: 'include'
+                });
+                
+                if (!challengeResponse.ok) {
+                    throw new Error('Failed to get challenge');
+                }
+                
+                const challenge = await challengeResponse.json();
+                statusEl.textContent = '{{ __("Please authenticate with your device...") }}';
+                
+                // Create credential
+                const credential = await navigator.credentials.create({
+                    publicKey: challenge
+                });
+                
+                statusEl.textContent = '{{ __("Verifying registration...") }}';
+                
+                // Send credential to server
+                const registerResponse = await fetch('{{ route("webauthn.registration") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        credential: {
+                            id: credential.id,
+                            rawId: Array.from(new Uint8Array(credential.rawId)),
+                            response: {
+                                clientDataJSON: Array.from(new Uint8Array(credential.response.clientDataJSON)),
+                                attestationObject: Array.from(new Uint8Array(credential.response.attestationObject))
+                            },
+                            type: credential.type
+                        },
+                        challenge: challenge.challenge
+                    })
+                });
+                
+                if (registerResponse.ok) {
+                    statusEl.textContent = '{{ __("Device registered successfully!") }}';
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    throw new Error('Registration failed');
+                }
+            } catch (error) {
+                statusEl.textContent = '{{ __("Error: ") }}' + error.message;
+                console.error('WebAuthn error:', error);
+            }
+        });
+    </script>
+    @endpush
 </x-app-layout>
 

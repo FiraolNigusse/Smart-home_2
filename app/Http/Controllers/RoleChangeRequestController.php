@@ -88,6 +88,7 @@ class RoleChangeRequestController extends Controller
             'reviewed_at' => now(),
         ]);
 
+        $oldRoleId = $roleChangeRequest->user->role_id;
         $roleChangeRequest->user->update(['role_id' => $roleChangeRequest->requested_role_id]);
 
         $this->auditLogService->logAllowed(
@@ -96,6 +97,24 @@ class RoleChangeRequestController extends Controller
             'role_change_approve',
             $request,
             ['request_id' => $roleChangeRequest->id]
+        );
+
+        $this->systemLogService->log(
+            eventType: 'role.changed',
+            severity: 'warning',
+            actor: auth()->user(),
+            message: 'User role changed',
+            context: [
+                'user_id' => $roleChangeRequest->user->id,
+                'user_email' => $roleChangeRequest->user->email,
+                'old_role_id' => $oldRoleId,
+                'new_role_id' => $roleChangeRequest->requested_role_id,
+                'request_id' => $roleChangeRequest->id,
+            ],
+            sensitivePayload: [
+                'old_role' => $roleChangeRequest->currentRole->name ?? null,
+                'new_role' => $roleChangeRequest->requestedRole->name ?? null,
+            ]
         );
 
         $this->systemLogService->log(

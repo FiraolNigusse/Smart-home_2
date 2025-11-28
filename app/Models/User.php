@@ -9,6 +9,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use App\Models\PasswordHistory;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -23,6 +24,7 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $fillable = [
         'name',
         'email',
+        'phone',
         'password',
         'role_id',
     ];
@@ -46,6 +48,7 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return [
             'email_verified_at' => 'datetime',
+            'phone_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
     }
@@ -144,5 +147,18 @@ class User extends Authenticatable implements MustVerifyEmail
     public function clearanceHierarchy(): int
     {
         return $this->role?->sensitivityLevel?->hierarchy ?? 0;
+    }
+
+    public function passwordHistory(): HasMany
+    {
+        return $this->hasMany(PasswordHistory::class);
+    }
+
+    /**
+     * Check if phone is verified.
+     */
+    public function hasVerifiedPhone(): bool
+    {
+        return !is_null($this->phone_verified_at);
     }
 }
