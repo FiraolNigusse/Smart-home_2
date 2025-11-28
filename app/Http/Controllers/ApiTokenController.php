@@ -15,6 +15,8 @@ class ApiTokenController extends Controller
 
     public function index(Request $request): View
     {
+        abort_unless($request->user()->isOwner(), 403, 'Only owners can manage API tokens.');
+
         $tokens = $request->user()->tokens()->latest()->get();
 
         return view('security.tokens', compact('tokens'));
@@ -22,6 +24,8 @@ class ApiTokenController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        abort_unless($request->user()->isOwner(), 403, 'Only owners can create API tokens.');
+
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'abilities' => ['nullable', 'string'],
@@ -44,6 +48,8 @@ class ApiTokenController extends Controller
 
     public function destroy(Request $request, string $tokenId): RedirectResponse
     {
+        abort_unless($request->user()->isOwner(), 403, 'Only owners can revoke API tokens.');
+
         $request->user()->tokens()->where('id', $tokenId)->delete();
 
         $this->systemLogService->log('token.revoked', 'warning', $request->user(), 'API token revoked', [

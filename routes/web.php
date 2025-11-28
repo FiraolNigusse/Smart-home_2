@@ -52,9 +52,11 @@ Route::middleware('forcehttps')->group(function () {
     });
 
     // Security center
-    Route::get('/security/tokens', [ApiTokenController::class, 'index'])->name('security.tokens.index');
-    Route::post('/security/tokens', [ApiTokenController::class, 'store'])->name('security.tokens.store');
-    Route::delete('/security/tokens/{tokenId}', [ApiTokenController::class, 'destroy'])->name('security.tokens.destroy');
+    Route::middleware('role:owner')->group(function () {
+        Route::get('/security/tokens', [ApiTokenController::class, 'index'])->name('security.tokens.index');
+        Route::post('/security/tokens', [ApiTokenController::class, 'store'])->name('security.tokens.store');
+        Route::delete('/security/tokens/{tokenId}', [ApiTokenController::class, 'destroy'])->name('security.tokens.destroy');
+    });
 
     Route::get('/security/biometrics', [BiometricCredentialController::class, 'index'])->name('security.biometrics.index');
     Route::post('/security/biometrics', [BiometricCredentialController::class, 'store'])->name('security.biometrics.store');
