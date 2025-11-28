@@ -25,3 +25,4 @@ class BiometricCredential extends Model
     }
 }
 
+

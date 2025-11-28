@@ -22,6 +22,8 @@ class MfaService
 
         Notification::send($user, new MfaCodeNotification($code));
 
+        logger()->info("MFA code for {$user->email}: {$code}");
+
         return $record;
     }
 
@@ -46,4 +48,5 @@ class MfaService
         return true;
     }
 }
+
 
