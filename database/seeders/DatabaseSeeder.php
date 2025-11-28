@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use App\Models\Role;
+use App\Models\UserAttribute;
 use Illuminate\Database\Seeder;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 
@@ -16,7 +17,10 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Seed roles first
+        // Seed sensitivity levels first
+        $this->call(SensitivityLevelSeeder::class);
+
+        // Seed roles
         $this->call(RoleSeeder::class);
 
         // Seed devices
@@ -27,7 +31,7 @@ class DatabaseSeeder extends Seeder
 
         // Create default owner user
         $ownerRole = Role::where('slug', 'owner')->first();
-        User::updateOrCreate(
+        $owner = User::updateOrCreate(
             ['email' => 'owner@smarthome.local'],
             [
                 'name' => 'System Owner',
@@ -35,10 +39,19 @@ class DatabaseSeeder extends Seeder
                 'role_id' => $ownerRole?->id,
             ]
         );
+        UserAttribute::updateOrCreate(
+            ['user_id' => $owner->id],
+            [
+                'department' => 'Executive',
+                'location' => 'HQ',
+                'employment_status' => 'Full-time',
+                'attributes' => ['role' => 'manager'],
+            ]
+        );
 
         // Create sample family member
         $familyRole = Role::where('slug', 'family')->first();
-        User::updateOrCreate(
+        $family = User::updateOrCreate(
             ['email' => 'family@smarthome.local'],
             [
                 'name' => 'Family Member',
@@ -46,15 +59,33 @@ class DatabaseSeeder extends Seeder
                 'role_id' => $familyRole?->id,
             ]
         );
+        UserAttribute::updateOrCreate(
+            ['user_id' => $family->id],
+            [
+                'department' => 'Household',
+                'location' => 'Home',
+                'employment_status' => 'Resident',
+                'attributes' => ['role' => 'member'],
+            ]
+        );
 
         // Create sample guest
         $guestRole = Role::where('slug', 'guest')->first();
-        User::updateOrCreate(
+        $guest = User::updateOrCreate(
             ['email' => 'guest@smarthome.local'],
             [
                 'name' => 'Guest User',
                 'password' => bcrypt('password'),
                 'role_id' => $guestRole?->id,
+            ]
+        );
+        UserAttribute::updateOrCreate(
+            ['user_id' => $guest->id],
+            [
+                'department' => 'Visitor',
+                'location' => 'Guest',
+                'employment_status' => 'Temporary',
+                'attributes' => ['role' => 'guest'],
             ]
         );
     }

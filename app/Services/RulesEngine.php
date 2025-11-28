@@ -17,23 +17,14 @@ class RulesEngine
      * @param string $action
      * @return array ['allowed' => bool, 'message' => string|null, 'rule' => Rule|null]
      */
-    public function checkPermission(User $user, Device $device, string $action): array
+    public function checkPermission(User $user, Device $device, string $action, array $context = []): array
     {
-        // First check if user has minimum role hierarchy for device
-        if (!$device->isAccessibleBy($user->role->hierarchy ?? 0)) {
-            return [
-                'allowed' => false,
-                'message' => 'You do not have permission to access this device.',
-                'rule' => null,
-            ];
-        }
-
         // Get all applicable rules
         $applicableRules = $this->getApplicableRules($user, $device, $action);
 
         // Evaluate rules in order (deny rules take precedence)
         foreach ($applicableRules as $rule) {
-            if ($rule->effect === 'deny' && $rule->evaluateCondition()) {
+            if ($rule->effect === 'deny' && $rule->evaluateCondition($context)) {
                 return [
                     'allowed' => false,
                     'message' => $rule->denial_message ?? 'Action denied by system rule.',
@@ -44,7 +35,7 @@ class RulesEngine
 
         // Check if there's an explicit allow rule
         foreach ($applicableRules as $rule) {
-            if ($rule->effect === 'allow' && $rule->evaluateCondition()) {
+            if ($rule->effect === 'allow' && $rule->evaluateCondition($context)) {
                 return [
                     'allowed' => true,
                     'message' => null,

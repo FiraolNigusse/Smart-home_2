@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\User;
 
 class Device extends Model
 {
@@ -15,6 +17,7 @@ class Device extends Model
         'settings',
         'is_active',
         'min_role_hierarchy',
+        'sensitivity_level_id',
     ];
 
     protected $casts = [
@@ -38,12 +41,25 @@ class Device extends Model
         return $this->hasMany(Rule::class);
     }
 
-    /**
-     * Check if device is accessible by role hierarchy.
-     */
-    public function isAccessibleBy(int $hierarchy): bool
+    public function sensitivityLevel(): BelongsTo
     {
-        return $this->is_active && $hierarchy >= $this->min_role_hierarchy;
+        return $this->belongsTo(SensitivityLevel::class);
+    }
+
+    public function permissions(): HasMany
+    {
+        return $this->hasMany(DevicePermission::class);
+    }
+
+    public function isAccessibleBy(User $user): bool
+    {
+        $roleHierarchy = $user->role->hierarchy ?? 0;
+        $clearance = $user->clearanceHierarchy();
+        $deviceSensitivity = $this->sensitivityLevel?->hierarchy ?? 0;
+
+        return $this->is_active
+            && $roleHierarchy >= $this->min_role_hierarchy
+            && $clearance >= $deviceSensitivity;
     }
 
     /**

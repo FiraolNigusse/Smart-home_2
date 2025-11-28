@@ -22,9 +22,7 @@ class DevicePolicy
      */
     public function view(User $user, Device $device): bool
     {
-        // Check if user has minimum hierarchy
-        $hierarchy = $user->role->hierarchy ?? 0;
-        return $device->isAccessibleBy($hierarchy);
+        return $device->isAccessibleBy($user);
     }
 
     /**

@@ -6,15 +6,18 @@ use App\Models\Rule;
 use App\Models\Role;
 use App\Models\Device;
 use App\Services\AuditLogService;
+use App\Services\SystemLogService;
 use Illuminate\Http\Request;
 
 class RuleController extends Controller
 {
     protected $auditLogService;
+    protected $systemLogService;
 
-    public function __construct(AuditLogService $auditLogService)
+    public function __construct(AuditLogService $auditLogService, SystemLogService $systemLogService)
     {
         $this->auditLogService = $auditLogService;
+        $this->systemLogService = $systemLogService;
         // Middleware is already applied in routes/web.php
     }
 
@@ -66,6 +69,14 @@ class RuleController extends Controller
             'create_rule',
             $request,
             ['rule_name' => $rule->name]
+        );
+
+        $this->systemLogService->log(
+            eventType: 'rule.created',
+            severity: 'info',
+            actor: auth()->user(),
+            message: 'Rule created',
+            context: ['rule_id' => $rule->id]
         );
 
         return redirect()->route('rules.index')
@@ -122,6 +133,14 @@ class RuleController extends Controller
             ['rule_name' => $rule->name, 'changes' => $validated]
         );
 
+        $this->systemLogService->log(
+            eventType: 'rule.updated',
+            severity: 'info',
+            actor: auth()->user(),
+            message: 'Rule updated',
+            context: ['rule_id' => $rule->id]
+        );
+
         return redirect()->route('rules.index')
             ->with('success', 'Rule updated successfully.');
     }
@@ -140,6 +159,14 @@ class RuleController extends Controller
         );
 
         $rule->delete();
+
+        $this->systemLogService->log(
+            eventType: 'rule.deleted',
+            severity: 'warning',
+            actor: auth()->user(),
+            message: 'Rule deleted',
+            context: ['rule_id' => $rule->id]
+        );
 
         return redirect()->route('rules.index')
             ->with('success', 'Rule deleted successfully.');

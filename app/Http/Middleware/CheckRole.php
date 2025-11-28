@@ -44,7 +44,7 @@ class CheckRole
         $minRequiredHierarchy = min($requiredHierarchies);
 
         if ($userHierarchy >= $minRequiredHierarchy) {
-            return $next($request);
+        return $next($request);
         }
 
         abort(403, 'Unauthorized access. Insufficient role permissions.');

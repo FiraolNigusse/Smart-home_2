@@ -69,6 +69,9 @@
                                 <option value="always" {{ old('condition_type', $rule->condition_type) === 'always' ? 'selected' : '' }}>Always</option>
                                 <option value="time_window" {{ old('condition_type', $rule->condition_type) === 'time_window' ? 'selected' : '' }}>Time Window</option>
                                 <option value="day_of_week" {{ old('condition_type', $rule->condition_type) === 'day_of_week' ? 'selected' : '' }}>Day of Week</option>
+                                <option value="location" {{ old('condition_type', $rule->condition_type) === 'location' ? 'selected' : '' }}>Location</option>
+                                <option value="device_type" {{ old('condition_type', $rule->condition_type) === 'device_type' ? 'selected' : '' }}>Device Type</option>
+                                <option value="attribute" {{ old('condition_type', $rule->condition_type) === 'attribute' ? 'selected' : '' }}>User Attribute</option>
                             </select>
                             @error('condition_type')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -78,10 +81,12 @@
                         <div class="mb-4">
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Condition Parameters (JSON)</label>
                             <textarea name="condition_params" id="condition_params_input" rows="4" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 font-mono text-sm">{{ old('condition_params', json_encode($rule->condition_params, JSON_PRETTY_PRINT)) }}</textarea>
-                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                For time_window: {"start_time": "22:00", "end_time": "06:00"}<br>
-                                For day_of_week: {"days": [0,1,2,3,4,5,6]} (0=Sunday, 6=Saturday)<br>
-                                For always: {}
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                                <span>Time window: {"start_time": "22:00", "end_time": "06:00"}</span><br>
+                                <span>Day of week: {"days": [0,1,2,3,4,5,6]}</span><br>
+                                <span>Location: {"locations": ["front_door","garage"]}</span><br>
+                                <span>Device type: {"types": ["lock","camera"]}</span><br>
+                                <span>Attribute: {"attribute": "department", "operator": "equals", "value": "HR"}</span>
                             </p>
                             @error('condition_params')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>

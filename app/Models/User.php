@@ -2,15 +2,18 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -58,9 +61,44 @@ class User extends Authenticatable
     /**
      * Get all audit logs for the user.
      */
-    public function auditLogs()
+    public function auditLogs(): HasMany
     {
         return $this->hasMany(AuditLog::class);
+    }
+
+    public function devicePermissions(): HasMany
+    {
+        return $this->hasMany(DevicePermission::class, 'target_user_id');
+    }
+
+    public function ownedDevicePermissions(): HasMany
+    {
+        return $this->hasMany(DevicePermission::class, 'owner_user_id');
+    }
+
+    public function roleChangeRequests(): HasMany
+    {
+        return $this->hasMany(RoleChangeRequest::class);
+    }
+
+    public function attributeProfile(): HasOne
+    {
+        return $this->hasOne(UserAttribute::class);
+    }
+
+    public function biometricCredentials(): HasMany
+    {
+        return $this->hasMany(BiometricCredential::class);
+    }
+
+    public function mfaCodes(): HasMany
+    {
+        return $this->hasMany(MfaCode::class);
+    }
+
+    public function systemLogs(): HasMany
+    {
+        return $this->hasMany(SystemLog::class, 'actor_user_id');
     }
 
     /**
@@ -101,5 +139,10 @@ class User extends Authenticatable
     public function isGuest(): bool
     {
         return $this->hasRole('guest');
+    }
+
+    public function clearanceHierarchy(): int
+    {
+        return $this->role?->sensitivityLevel?->hierarchy ?? 0;
     }
 }

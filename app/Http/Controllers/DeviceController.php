@@ -3,21 +3,22 @@
 namespace App\Http\Controllers;
 
 use App\Models\Device;
-use App\Services\RulesEngine;
+use App\Models\DevicePermission;
+use App\Models\PermissionLog;
+use App\Models\SensitivityLevel;
+use App\Models\User;
+use App\Services\AccessDecisionService;
 use App\Services\AuditLogService;
+use App\Services\SystemLogService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
 
 class DeviceController extends Controller
 {
-    protected $rulesEngine;
-    protected $auditLogService;
-
-    public function __construct(RulesEngine $rulesEngine, AuditLogService $auditLogService)
-    {
-        $this->rulesEngine = $rulesEngine;
-        $this->auditLogService = $auditLogService;
-        // Middleware is already applied in routes/web.php
+    public function __construct(
+        protected AccessDecisionService $accessDecisionService,
+        protected AuditLogService $auditLogService,
+        protected SystemLogService $systemLogService,
+    ) {
     }
 
     /**
@@ -27,10 +28,24 @@ class DeviceController extends Controller
     {
         $user = auth()->user();
         $hierarchy = $user->role->hierarchy ?? 0;
+        $clearance = $user->clearanceHierarchy();
 
-        // Filter devices based on user's role hierarchy
-        $devices = Device::where('is_active', true)
-            ->where('min_role_hierarchy', '<=', $hierarchy)
+        $permittedDeviceIds = DevicePermission::where('target_user_id', $user->id)->pluck('device_id');
+
+        $devices = Device::with('sensitivityLevel')
+            ->where('is_active', true)
+            ->where(function ($query) use ($hierarchy, $clearance, $permittedDeviceIds) {
+                $query->where(function ($inner) use ($hierarchy, $clearance) {
+                    $inner->where('min_role_hierarchy', '<=', $hierarchy)
+                        ->where(function ($classificationQuery) use ($clearance) {
+                            $classificationQuery->whereNull('sensitivity_level_id')
+                                ->orWhereHas('sensitivityLevel', function ($subQuery) use ($clearance) {
+                                    $subQuery->where('hierarchy', '<=', $clearance);
+                                });
+                        });
+                })
+                ->orWhereIn('id', $permittedDeviceIds);
+            })
             ->get();
 
         return view('devices.index', compact('devices'));
@@ -42,7 +57,8 @@ class DeviceController extends Controller
     public function create()
     {
         $this->authorize('create', Device::class);
-        return view('devices.create');
+        $sensitivityLevels = SensitivityLevel::orderBy('hierarchy')->get();
+        return view('devices.create', compact('sensitivityLevels'));
     }
 
     /**
@@ -59,6 +75,7 @@ class DeviceController extends Controller
             'status' => 'nullable|string|max:255',
             'settings' => 'nullable|array',
             'min_role_hierarchy' => 'required|integer|min:1|max:3',
+            'sensitivity_level_id' => 'nullable|exists:sensitivity_levels,id',
         ]);
 
         $device = Device::create($validated);
@@ -69,6 +86,14 @@ class DeviceController extends Controller
             'create',
             $request,
             ['device_name' => $device->name]
+        );
+
+        $this->systemLogService->log(
+            eventType: 'device.created',
+            severity: 'info',
+            actor: auth()->user(),
+            message: 'Device created',
+            context: ['device_id' => $device->id]
         );
 
         return redirect()->route('devices.index')
@@ -82,13 +107,14 @@ class DeviceController extends Controller
     {
         $user = auth()->user();
         
-        // Check if user can access this device
-        if (!$device->isAccessibleBy($user->role->hierarchy ?? 0)) {
+        $decision = $this->accessDecisionService->evaluate($user, $device, 'view');
+
+        if (!$decision['allowed']) {
             $this->auditLogService->logDenied(
                 $user,
                 $device,
                 'view',
-                'Insufficient role hierarchy',
+                $decision['message'] ?? 'Access denied',
                 request()
             );
             abort(403, 'You do not have permission to view this device.');
@@ -96,7 +122,11 @@ class DeviceController extends Controller
 
         $this->auditLogService->logAllowed($user, $device, 'view', request());
 
-        return view('devices.show', compact('device'));
+        $permissions = $device->permissions()->with('target')->get();
+        $users = User::orderBy('name')->get();
+        $sensitivityLevels = SensitivityLevel::orderBy('hierarchy')->get();
+
+        return view('devices.show', compact('device', 'permissions', 'users', 'sensitivityLevels'));
     }
 
     /**
@@ -105,7 +135,8 @@ class DeviceController extends Controller
     public function edit(Device $device)
     {
         $this->authorize('update', $device);
-        return view('devices.edit', compact('device'));
+        $sensitivityLevels = SensitivityLevel::orderBy('hierarchy')->get();
+        return view('devices.edit', compact('device', 'sensitivityLevels'));
     }
 
     /**
@@ -123,6 +154,7 @@ class DeviceController extends Controller
             'settings' => 'nullable|array',
             'min_role_hierarchy' => 'required|integer|min:1|max:3',
             'is_active' => 'boolean',
+            'sensitivity_level_id' => 'nullable|exists:sensitivity_levels,id',
         ]);
 
         $device->update($validated);
@@ -133,6 +165,14 @@ class DeviceController extends Controller
             'update',
             $request,
             ['changes' => $validated]
+        );
+
+        $this->systemLogService->log(
+            eventType: 'device.updated',
+            severity: 'info',
+            actor: auth()->user(),
+            message: 'Device updated',
+            context: ['device_id' => $device->id]
         );
 
         return redirect()->route('devices.index')
@@ -156,6 +196,14 @@ class DeviceController extends Controller
 
         $device->delete();
 
+        $this->systemLogService->log(
+            eventType: 'device.deleted',
+            severity: 'warning',
+            actor: auth()->user(),
+            message: 'Device deleted',
+            context: ['device_id' => $device->id]
+        );
+
         return redirect()->route('devices.index')
             ->with('success', 'Device deleted successfully.');
     }
@@ -169,8 +217,12 @@ class DeviceController extends Controller
         $action = $request->input('action'); // turn_on, turn_off, lock, unlock, etc.
         $settings = $request->input('settings', []);
 
-        // Check permission using rules engine
-        $permission = $this->rulesEngine->checkPermission($user, $device, $action);
+        $context = [
+            'location' => $request->input('location_override'),
+            'ip' => $request->ip(),
+        ];
+
+        $permission = $this->accessDecisionService->evaluate($user, $device, $action, $context);
 
         if (!$permission['allowed']) {
             $this->auditLogService->logDenied(
@@ -222,5 +274,82 @@ class DeviceController extends Controller
         ];
 
         return $statusMap[$action] ?? 'unknown';
+    }
+
+    public function grantPermission(Request $request, Device $device)
+    {
+        $this->authorize('update', $device);
+
+        $validated = $request->validate([
+            'target_user_id' => 'required|exists:users,id|not_in:' . auth()->id(),
+            'can_control' => 'sometimes|boolean',
+            'can_view' => 'sometimes|boolean',
+            'allowed_actions' => 'nullable|array',
+            'allowed_actions.*' => 'string',
+            'expires_at' => 'nullable|date',
+        ]);
+
+        $allowedActions = collect($validated['allowed_actions'] ?? [])
+            ->filter(fn ($value) => filled($value))
+            ->values()
+            ->all();
+
+        $permission = DevicePermission::updateOrCreate(
+            [
+                'device_id' => $device->id,
+                'target_user_id' => $validated['target_user_id'],
+            ],
+            [
+                'owner_user_id' => auth()->id(),
+                'can_view' => $validated['can_view'] ?? true,
+                'can_control' => $validated['can_control'] ?? false,
+                'allowed_actions' => $allowedActions,
+                'expires_at' => $validated['expires_at'] ?? null,
+            ]
+        );
+
+        $this->logPermissionChange('granted', $permission, [
+            'allowed_actions' => $allowedActions,
+            'can_view' => $validated['can_view'] ?? true,
+            'can_control' => $validated['can_control'] ?? false,
+            'expires_at' => $validated['expires_at'] ?? null,
+        ]);
+
+        return back()->with('success', 'Permission updated.');
+    }
+
+    public function revokePermission(Device $device, DevicePermission $permission)
+    {
+        $this->authorize('update', $device);
+
+        if ($permission->device_id !== $device->id) {
+            abort(404);
+        }
+
+        $permission->delete();
+
+        $this->logPermissionChange('revoked', $permission);
+
+        return back()->with('success', 'Permission revoked.');
+    }
+
+    protected function logPermissionChange(string $action, DevicePermission $permission, array $changes = []): void
+    {
+        PermissionLog::create([
+            'actor_user_id' => auth()->id(),
+            'target_user_id' => $permission->target_user_id,
+            'device_id' => $permission->device_id,
+            'action' => $action,
+            'changes' => $changes,
+            'logged_at' => now(),
+        ]);
+
+        $this->systemLogService->log(
+            eventType: "permission.{$action}",
+            severity: 'info',
+            actor: auth()->user(),
+            message: "Permission {$action} for user {$permission->target_user_id} on device {$permission->device_id}",
+            context: $changes,
+        );
     }
 }

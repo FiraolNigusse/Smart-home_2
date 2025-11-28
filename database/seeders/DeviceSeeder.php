@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Device;
+use App\Models\SensitivityLevel;
 use Illuminate\Database\Seeder;
 
 class DeviceSeeder extends Seeder
@@ -88,6 +89,14 @@ class DeviceSeeder extends Seeder
         ];
 
         foreach ($devices as $device) {
+            $levelSlug = match ($device['type']) {
+                'control_panel', 'camera' => 'confidential',
+                'lock', 'door', 'thermostat' => 'internal',
+                default => 'public',
+            };
+
+            $device['sensitivity_level_id'] = SensitivityLevel::where('slug', $levelSlug)->value('id');
+
             Device::updateOrCreate(
                 ['name' => $device['name'], 'location' => $device['location']],
                 $device

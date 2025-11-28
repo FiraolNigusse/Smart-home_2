@@ -1,189 +1,238 @@
-# Smart Home Access Control Dashboard - Setup Guide
+# Smart Home Access Control Dashboard — Setup Guide
 
 ## Quick Start
 
-1. **Install Dependencies**:
-```bash
-composer install
-npm install
-```
+1. **Install dependencies**
 
-2. **Configure Environment**:
-```bash
-cp .env.example .env
-php artisan key:generate
-```
+   ```bash
+   composer install
+   npm install
+   ```
 
-3. **Update Database Settings in `.env`**:
-```env
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=smarthome
-DB_USERNAME=your_username
-DB_PASSWORD=your_password
-```
+2. **Configure environment**
 
-4. **Run Migrations & Seeders**:
-```bash
-php artisan migrate:fresh --seed
-```
+   ```bash
+   cp .env.example .env
+   php artisan key:generate
+   ```
 
-5. **Build Frontend**:
-```bash
-npm run build
-```
+3. **Update database settings in `.env`**
 
-6. **Start Server**:
-```bash
-php artisan serve
-```
+   ```env
+   DB_CONNECTION=mysql
+   DB_HOST=127.0.0.1
+   DB_PORT=3306
+   DB_DATABASE=smarthome
+   DB_USERNAME=your_username
+   DB_PASSWORD=your_password
+   ```
 
-7. **Access Application**:
-   - Open: http://localhost:8000
-   - Login with: `owner@smarthome.local` / `password`
+4. **Run migrations & seeders**
+
+   ```bash
+   php artisan migrate
+   php artisan db:seed
+   ```
+
+5. **Build frontend**
+
+   ```bash
+   npm run build
+   ```
+
+6. **Start server**
+
+   ```bash
+   php artisan serve
+   ```
+
+7. **Access application**
+
+   - Open: <http://localhost:8000>
+   - Log in with: `owner@smarthome.local` / `password`
 
 ## Default Test Accounts
 
-| Role | Email | Password | Permissions |
-|------|-------|----------|-------------|
-| Owner | owner@smarthome.local | password | Full access, can manage devices and rules |
-| Family | family@smarthome.local | password | Can control most devices, view logs |
-| Guest | guest@smarthome.local | password | Limited access, time-restricted |
+| Role   | Email                   | Password | Permissions                                      |
+|--------|-------------------------|----------|--------------------------------------------------|
+| Owner  | owner@smarthome.local  | password | Full access, manage devices/rules/MAC/DAC.       |
+| Family | family@smarthome.local | password | Control most devices, submit role requests.      |
+| Guest  | guest@smarthome.local  | password | Limited, time/location-restricted access.        |
 
 ## Features Overview
 
-### 1. Role-Based Access Control (RBAC)
-- **Owner** (Hierarchy 3): Full system control
-- **Family** (Hierarchy 2): Partial device access
-- **Guest** (Hierarchy 1): Limited, time-restricted access
+### 1. Mandatory Access Control (MAC)
 
-### 2. Rule-Based Access Control (RuBAC)
-- Time-based restrictions (e.g., guests cannot unlock doors after 10 PM)
-- Device-specific rules
-- Action-specific rules
-- Role-specific rules
+- Sensitivity labels (Public/Internal/Confidential) stored in `sensitivity_levels`.
+- Roles include clearance; devices carry a classification selected during create/edit.
+- Only owners may adjust classifications to guarantee admin-only policy changes.
 
-### 3. Device Management
-- Create, edit, delete devices (Owner only)
-- Control devices (based on role permissions)
-- Device types: lights, locks, thermostats, cameras, doors, sensors, control panels
+### 2. Discretionary Access Control (DAC)
 
-### 4. Audit Logging
-- All actions are logged with:
-  - User who performed the action
-  - Device affected
-  - Action type
-  - Status (allowed/denied)
-  - Timestamp
-  - IP address and user agent
-  - Additional metadata
+- Owners can grant per-user permissions (view/control/specific actions with expiration).
+- Grants/revokes recorded in `device_permissions` & `permission_logs`, plus system logs.
 
-### 5. Backup & Recovery
+### 3. Role-Based Access Control (RBAC)
+
+- Owner (3) / Family (2) / Guest (1) hierarchy.
+- Users submit role change requests; owners approve/deny with decision notes.
+- Every change is audited and tracked in `role_change_requests`.
+
+### 4. Rule- & Attribute-Based Access Control (RuBAC + ABAC)
+
+- Rules support `time_window`, `day_of_week`, `location`, `device_type`, and `attribute`.
+- Attribute profiles (department, location, employment status, etc.) live in `user_attributes`.
+- ABAC policies defined in `config/access.php` combine attributes, roles, and context.
+
+### 5. Device Management
+
+- Owners manage devices and assign sensitivity labels.
+- Users control devices via MAC/RBAC/ABAC-enforced actions.
+- DAC management (grant/revoke permissions) sits directly on each device detail page.
+
+### 6. Audit & System Logging
+
+- Activity logs capture user, device, action, status, timestamp, IP, and metadata.
+- Permission changes, role decisions, and system events (boot/shutdown/config) logged centrally.
+- `SystemLogService` encrypts sensitive payloads before storage.
+
+### 7. Backup & Recovery
+
 - Manual backup: `php artisan system:backup`
 - Restore: `php artisan system:restore storage/backups/backup_YYYY-MM-DD_HH-MM-SS.zip`
-- Automatic daily backups at 2 AM
+- Automatic daily backups at 2 AM (see `bootstrap/app.php`)
 
 ## Testing Scenarios
 
-### Test 1: Guest Time Restriction
-1. Log in as `guest@smarthome.local`
-2. Try to unlock a door after 10 PM
-3. Should be denied with message: "Guests cannot unlock doors between 10 PM and 6 AM"
+### Test 1: Guest Time Restriction (RuBAC)
 
-### Test 2: Family Access
-1. Log in as `family@smarthome.local`
-2. Should see most devices (except owner-only devices)
-3. Can control lights, locks, etc.
-4. Cannot create/edit devices or rules
+1. Log in as `guest@smarthome.local`.
+2. Attempt to unlock a door after 22:00.
+3. Expect denial: "Guests cannot unlock doors between 10 PM and 6 AM."
 
-### Test 3: Owner Full Access
-1. Log in as `owner@smarthome.local`
-2. Can create/edit/delete devices
-3. Can create/edit/delete rules
-4. Can view all audit logs
-5. Can export logs
+### Test 2: DAC Override
+
+1. As owner, grant DAC access to the guest for a device.
+2. As guest, confirm you can control the device despite hierarchy limits.
+3. Verify permission and system logs show the override.
+
+### Test 3: Role Change Workflow
+
+1. As family, submit a role change request with justification.
+2. As owner, approve or deny it with reviewer notes.
+3. Confirm audit/system logs capture the outcome.
+
+### Test 4: Attribute-Based Policy
+
+1. Update profile attributes (e.g., Department = `Payroll`).
+2. Trigger an ABAC-protected action (per `config/access.php`) to verify allow/deny.
+
+### Test 5: Family Access Baseline
+
+1. Log in as `family@smarthome.local`.
+2. Ensure devices respect role hierarchy and MAC labels.
+3. Confirm device editing remains restricted to owners.
+
+### Test 6: Owner Capabilities
+
+1. Log in as `owner@smarthome.local`.
+2. Create/edit/delete devices and rules.
+3. Review/export audit logs and check system event entries.
 
 ## Artisan Commands
 
 ### Backup System
+
 ```bash
 php artisan system:backup
-# Creates backup in storage/backups/backup_YYYY-MM-DD_HH-MM-SS.zip
+# Creates storage/backups/backup_YYYY-MM-DD_HH-MM-SS.zip
 ```
 
 ### Restore System
+
 ```bash
 php artisan system:restore storage/backups/backup_2025-11-22_12-00-00.zip
-# Restores devices, logs, and rules from backup
+# Restores devices, logs, rules, MAC/DAC metadata
 ```
 
 ## Project Architecture
 
 ### Models
-- **User**: Extends Laravel's Authenticatable, has role relationship
-- **Role**: Defines user roles with hierarchy
-- **Device**: Smart home devices with status and settings
-- **Rule**: Access control rules with conditions
-- **AuditLog**: Action logs with full context
+
+- **User / Role / SensitivityLevel** — clearance hierarchy + MAC metadata.
+- **Device** — classification, status, discretionary permissions.
+- **Rule** — JSON-driven condition set for RuBAC/ABAC.
+- **DevicePermission & PermissionLog** — DAC state and audit trail.
+- **RoleChangeRequest** — RBAC workflow management.
+- **UserAttribute** — ABAC attribute bag.
+- **AuditLog & SystemLog** — user and system event tracking.
 
 ### Services
-- **RulesEngine**: Evaluates rules and permissions
-- **AuditLogService**: Handles logging of all actions
 
-### Middleware
-- **CheckRole**: Validates user roles for route access
+- **AccessDecisionService** — orchestrates MAC, DAC, RBAC, RuBAC, ABAC.
+- **AttributePolicyService** — evaluates ABAC policies from `config/access.php`.
+- **RulesEngine** — processes conditional rules with context.
+- **AuditLogService / SystemLogService** — structured logging with encryption support.
+
+### Middleware & Policies
+
+- **CheckRole** — role-based route enforcement.
+- **DevicePolicy** — restricts classification and device changes to owners.
 
 ### Controllers
-- **DashboardController**: Main dashboard with statistics
-- **DeviceController**: Device CRUD and control
-- **AuditLogController**: View and export logs
-- **RuleController**: Rule management (Owner only)
+
+- **DashboardController** — overview + stats.
+- **DeviceController** — CRUD, control actions, MAC/DAC management.
+- **AuditLogController** — activity viewer/exporter.
+- **RuleController** — owner-only rule management.
+- **RoleChangeRequestController** — submit/review workflow.
 
 ## Security Considerations
 
-1. **Password Security**: All passwords are hashed using bcrypt
-2. **CSRF Protection**: All forms include CSRF tokens
-3. **Authorization**: Policies and middleware enforce access control
-4. **Audit Trail**: All actions are logged for security monitoring
-5. **Input Validation**: All inputs are validated using Laravel's validation
+1. Passwords hashed with bcrypt.
+2. CSRF tokens on all forms.
+3. Comprehensive MAC/DAC/RBAC/RuBAC/ABAC enforcement.
+4. Full audit trail for user/system events (with encrypted payload support).
+5. Strict request validation for every form.
 
 ## Troubleshooting
 
-### Issue: Migration fails
-**Solution**: Ensure database exists and credentials in `.env` are correct
+### Migration Fails
 
-### Issue: Seeder fails
-**Solution**: Run migrations first, then seeders separately:
+Ensure the target database exists and check `.env` credentials.
+
+### Seeder Fails
+
+Run migrations before seeding:
+
 ```bash
 php artisan migrate
 php artisan db:seed
 ```
 
-### Issue: Assets not loading
-**Solution**: Build assets:
+### Assets Not Loading
+
 ```bash
 npm run build
-# Or for development:
+# or for development
 npm run dev
 ```
 
-### Issue: Permission denied errors
-**Solution**: Check file permissions:
+### Permission Errors
+
 ```bash
 chmod -R 775 storage bootstrap/cache
 ```
 
 ## Next Steps
 
-1. Customize device types and locations
-2. Add more rules based on your needs
-3. Configure scheduled backups
-4. Set up email notifications (optional)
-5. Deploy to production server
+1. Customize devices, rules, and ABAC policies (`config/access.php`).
+2. Integrate notifications (email/SMS) for role requests or alerts.
+3. Extend authentication hardening (CAPTCHA, MFA, lockout policies).
+4. Configure alerting on critical system events.
+5. Deploy behind HTTPS with reverse proxy or load balancer.
 
 ## Support
 
-For Laravel-specific issues, refer to [Laravel Documentation](https://laravel.com/docs)
-
+Consult the [Laravel documentation](https://laravel.com/docs) for framework-specific guidance.
 

@@ -62,6 +62,30 @@ class RuleSeeder extends Seeder
                 'effect' => 'deny',
                 'denial_message' => 'Guests can only control lights during daytime hours (7 AM - 8 PM).',
             ],
+            [
+                'name' => 'Block remote unlock attempts',
+                'description' => 'Prevents unlocking entry points when device location is exterior at night',
+                'role_id' => null,
+                'device_id' => $frontDoorLock?->id,
+                'action' => 'unlock',
+                'condition_type' => 'location',
+                'condition_params' => ['locations' => ['front_door']],
+                'is_active' => true,
+                'effect' => 'deny',
+                'denial_message' => 'Unlocking front doors remotely is restricted by MAC policy.',
+            ],
+            [
+                'name' => 'Only cameras during working hours',
+                'description' => 'Cameras can be disabled only during business hours',
+                'role_id' => $guestRole?->id,
+                'device_id' => null,
+                'action' => 'turn_off',
+                'condition_type' => 'device_type',
+                'condition_params' => ['types' => ['camera']],
+                'is_active' => true,
+                'effect' => 'deny',
+                'denial_message' => 'Cameras cannot be disabled.',
+            ],
         ];
 
         foreach ($rules as $rule) {

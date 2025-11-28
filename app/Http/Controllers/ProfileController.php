@@ -18,6 +18,7 @@ class ProfileController extends Controller
     {
         return view('profile.edit', [
             'user' => $request->user(),
+            'attributes' => $request->user()->attributeProfile,
         ]);
     }
 
@@ -26,13 +27,24 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
+        $validated = $request->validated();
+
+        $request->user()->fill($validated);
 
         if ($request->user()->isDirty('email')) {
             $request->user()->email_verified_at = null;
         }
 
         $request->user()->save();
+
+        $attributeData = $request->only(['department', 'location', 'employment_status']);
+
+        if (array_filter($attributeData)) {
+            $request->user()->attributeProfile()->updateOrCreate(
+                ['user_id' => $request->user()->id],
+                $attributeData
+            );
+        }
 
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }

@@ -4,22 +4,29 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\CaptchaService;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 
 class RegisteredUserController extends Controller
 {
+    public function __construct(protected CaptchaService $captchaService)
+    {
+    }
+
     /**
      * Display the registration view.
      */
     public function create(): View
     {
-        return view('auth.register');
+        $captchaQuestion = $this->captchaService->generate('register');
+
+        return view('auth.register', compact('captchaQuestion'));
     }
 
     /**
@@ -32,8 +39,23 @@ class RegisteredUserController extends Controller
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'password' => [
+                'required',
+                'confirmed',
+                Password::min(config('security.password_rules.min'))
+                    ->mixedCase()
+                    ->numbers()
+                    ->symbols()
+                    ->uncompromised(),
+            ],
+            'captcha_answer' => ['required'],
         ]);
+
+        if (! $this->captchaService->validate($request->input('captcha_answer'), 'register')) {
+            return back()
+                ->withErrors(['captcha_answer' => 'Incorrect answer to the security question.'])
+                ->withInput($request->except('password', 'password_confirmation'));
+        }
 
         $user = User::create([
             'name' => $request->name,
@@ -45,6 +67,6 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
-        return redirect(route('dashboard', absolute: false));
+        return redirect()->route('verification.notice');
     }
 }

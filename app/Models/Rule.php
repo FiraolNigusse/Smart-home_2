@@ -72,7 +72,7 @@ class Rule extends Model
     /**
      * Evaluate the rule condition.
      */
-    public function evaluateCondition(): bool
+    public function evaluateCondition(array $context = []): bool
     {
         $params = $this->condition_params ?? [];
 
@@ -81,6 +81,12 @@ class Rule extends Model
                 return $this->evaluateTimeWindow($params);
             case 'day_of_week':
                 return $this->evaluateDayOfWeek($params);
+            case 'location':
+                return $this->evaluateLocation($params, $context);
+            case 'device_type':
+                return $this->evaluateDeviceType($params, $context);
+            case 'attribute':
+                return $this->evaluateAttribute($params, $context);
             case 'always':
                 return true;
             default:
@@ -116,5 +122,49 @@ class Rule extends Model
         $currentDay = Carbon::now()->dayOfWeek; // 0 (Sunday) to 6 (Saturday)
 
         return in_array($currentDay, $allowedDays);
+    }
+
+    protected function evaluateLocation(array $params, array $context): bool
+    {
+        $allowedLocations = $params['locations'] ?? [];
+        $currentLocation = $context['location'] ?? null;
+
+        if (empty($allowedLocations) || $currentLocation === null) {
+            return false;
+        }
+
+        return in_array($currentLocation, $allowedLocations, true);
+    }
+
+    protected function evaluateDeviceType(array $params, array $context): bool
+    {
+        $types = $params['types'] ?? [];
+        $deviceType = $context['device_type'] ?? null;
+
+        if (empty($types) || $deviceType === null) {
+            return false;
+        }
+
+        return in_array($deviceType, $types, true);
+    }
+
+    protected function evaluateAttribute(array $params, array $context): bool
+    {
+        $attribute = $params['attribute'] ?? null;
+        $operator = $params['operator'] ?? 'equals';
+        $value = $params['value'] ?? null;
+
+        if (!$attribute) {
+            return false;
+        }
+
+        $actual = $context['attributes'][$attribute] ?? $context[$attribute] ?? null;
+
+        return match ($operator) {
+            'equals' => $actual === $value,
+            'not_equals' => $actual !== $value,
+            'in' => is_array($value) && in_array($actual, $value, true),
+            default => false,
+        };
     }
 }

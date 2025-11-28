@@ -59,13 +59,19 @@ class LoginRequest extends FormRequest
      */
     public function ensureIsNotRateLimited(): void
     {
-        if (! RateLimiter::tooManyAttempts($this->throttleKey(), 5)) {
+        $maxAttempts = (int) config('security.login_attempts', 5);
+        $decay = (int) config('security.login_decay_seconds', 300);
+
+        if (! RateLimiter::tooManyAttempts($this->throttleKey(), $maxAttempts)) {
             return;
         }
 
         event(new Lockout($this));
 
         $seconds = RateLimiter::availableIn($this->throttleKey());
+        if ($seconds <= 0) {
+            $seconds = $decay;
+        }
 
         throw ValidationException::withMessages([
             'email' => trans('auth.throttle', [

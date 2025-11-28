@@ -26,6 +26,9 @@
                             required autocomplete="new-password" />
 
             <x-input-error :messages="$errors->get('password')" class="mt-2" />
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {{ __('Use at least 12 characters with upper/lowercase letters, a number, and a symbol.') }}
+            </p>
         </div>
 
         <!-- Confirm Password -->
@@ -37,6 +40,16 @@
                             name="password_confirmation" required autocomplete="new-password" />
 
             <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
+        </div>
+
+        <!-- CAPTCHA -->
+        <div class="mt-4">
+            <x-input-label for="captcha_answer" :value="$captchaQuestion ?? __('Security Question')" />
+            <x-text-input id="captcha_answer" class="block mt-1 w-full"
+                          type="text"
+                          name="captcha_answer"
+                          required />
+            <x-input-error :messages="$errors->get('captcha_answer')" class="mt-2" />
         </div>
 
         <div class="flex items-center justify-end mt-4">

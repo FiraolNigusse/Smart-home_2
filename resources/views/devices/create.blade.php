@@ -65,6 +65,21 @@
                             @enderror
                         </div>
 
+                        <div class="mb-4">
+                            <label for="sensitivity_level_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Sensitivity Label</label>
+                            <select name="sensitivity_level_id" id="sensitivity_level_id" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                <option value="">{{ __('Select sensitivity level') }}</option>
+                                @foreach($sensitivityLevels as $level)
+                                    <option value="{{ $level->id }}" {{ old('sensitivity_level_id') == $level->id ? 'selected' : '' }}>
+                                        {{ $level->name }} ({{ $level->description }})
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('sensitivity_level_id')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
                         <div class="flex items-center justify-end gap-4">
                             <a href="{{ route('devices.index') }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
                                 Cancel

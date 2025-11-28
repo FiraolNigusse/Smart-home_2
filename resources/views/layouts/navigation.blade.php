@@ -21,9 +21,21 @@
                     <x-nav-link :href="route('audit-logs.index')" :active="request()->routeIs('audit-logs.*')">
                         {{ __('Activity Logs') }}
                     </x-nav-link>
+                    <x-nav-link :href="route('role-requests.index')" :active="request()->routeIs('role-requests.index')">
+                        {{ __('Role Requests') }}
+                    </x-nav-link>
+                    <x-nav-link :href="route('security.tokens.index')" :active="request()->routeIs('security.tokens.*')">
+                        {{ __('API Tokens') }}
+                    </x-nav-link>
+                    <x-nav-link :href="route('security.biometrics.index')" :active="request()->routeIs('security.biometrics.*')">
+                        {{ __('Biometrics') }}
+                    </x-nav-link>
                     @if(auth()->user()->isOwner())
                     <x-nav-link :href="route('rules.index')" :active="request()->routeIs('rules.*')">
                         {{ __('Rules') }}
+                    </x-nav-link>
+                    <x-nav-link :href="route('role-requests.review')" :active="request()->routeIs('role-requests.review')">
+                        {{ __('Review Requests') }}
                     </x-nav-link>
                     @endif
                 </div>
@@ -87,9 +99,21 @@
             <x-responsive-nav-link :href="route('audit-logs.index')" :active="request()->routeIs('audit-logs.*')">
                 {{ __('Activity Logs') }}
             </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('role-requests.index')" :active="request()->routeIs('role-requests.index')">
+                {{ __('Role Requests') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('security.tokens.index')" :active="request()->routeIs('security.tokens.*')">
+                {{ __('API Tokens') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('security.biometrics.index')" :active="request()->routeIs('security.biometrics.*')">
+                {{ __('Biometrics') }}
+            </x-responsive-nav-link>
             @if(auth()->user()->isOwner())
             <x-responsive-nav-link :href="route('rules.index')" :active="request()->routeIs('rules.*')">
                 {{ __('Rules') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('role-requests.review')" :active="request()->routeIs('role-requests.review')">
+                {{ __('Review Requests') }}
             </x-responsive-nav-link>
             @endif
         </div>
