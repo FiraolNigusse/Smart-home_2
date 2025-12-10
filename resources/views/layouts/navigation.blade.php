@@ -21,9 +21,11 @@
                     <x-nav-link :href="route('audit-logs.index')" :active="request()->routeIs('audit-logs.*')">
                         {{ __('Activity Logs') }}
                     </x-nav-link>
+                    @if(!auth()->user()->isOwner())
                     <x-nav-link :href="route('role-requests.index')" :active="request()->routeIs('role-requests.index')">
                         {{ __('Role Requests') }}
                     </x-nav-link>
+                    @endif
                     
                     <!-- Security Dropdown -->
                     <x-dropdown align="left" width="48">
@@ -119,9 +121,11 @@
             <x-responsive-nav-link :href="route('audit-logs.index')" :active="request()->routeIs('audit-logs.*')">
                 {{ __('Activity Logs') }}
             </x-responsive-nav-link>
+            @if(!auth()->user()->isOwner())
             <x-responsive-nav-link :href="route('role-requests.index')" :active="request()->routeIs('role-requests.index')">
                 {{ __('Role Requests') }}
             </x-responsive-nav-link>
+            @endif
             
             <!-- Security Section -->
             <div class="px-3 py-2 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">

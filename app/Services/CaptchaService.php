@@ -2,35 +2,92 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class CaptchaService
 {
-    public function generate(string $context = 'default'): string
+    /**
+     * Get the reCAPTCHA site key for frontend display.
+     */
+    public function getSiteKey(): string
     {
-        $a = random_int(1, 9);
-        $b = random_int(1, 9);
-        $answer = $a + $b;
-
-        Session::put($this->key($context), $answer);
-
-        return "What is {$a} + {$b}?";
+        return config('recaptcha.site_key', '');
     }
 
-    public function validate(?string $value, string $context = 'default'): bool
+    /**
+     * Validate Google reCAPTCHA token.
+     */
+    public function validate(?string $token, string $context = 'default'): bool
     {
-        $expected = Session::pull($this->key($context));
-
-        if ($expected === null) {
+        if (empty($token)) {
+            Log::warning('reCAPTCHA token is empty', ['context' => $context]);
             return false;
         }
 
-        return (int) $value === (int) $expected;
+        $secretKey = config('recaptcha.secret_key');
+        $verifyUrl = config('recaptcha.verify_url', 'https://www.google.com/recaptcha/api/siteverify');
+
+        if (empty($secretKey)) {
+            Log::error('reCAPTCHA secret key is not configured');
+            return false;
+        }
+
+        try {
+            $response = Http::asForm()->post($verifyUrl, [
+                'secret' => $secretKey,
+                'response' => $token,
+                'remoteip' => request()->ip(),
+            ]);
+
+            $result = $response->json();
+
+            if (!$response->successful() || !isset($result['success'])) {
+                Log::warning('reCAPTCHA verification request failed', [
+                    'context' => $context,
+                    'status' => $response->status(),
+                    'response' => $result,
+                ]);
+                return false;
+            }
+
+            if ($result['success'] === true) {
+                Log::info('reCAPTCHA verification successful', [
+                    'context' => $context,
+                    'score' => $result['score'] ?? null,
+                ]);
+                return true;
+            }
+
+            Log::warning('reCAPTCHA verification failed', [
+                'context' => $context,
+                'errors' => $result['error-codes'] ?? [],
+            ]);
+
+            return false;
+        } catch (\Exception $e) {
+            Log::error('reCAPTCHA verification exception', [
+                'context' => $context,
+                'message' => $e->getMessage(),
+            ]);
+            return false;
+        }
     }
 
-    protected function key(string $context): string
+    /**
+     * Check if reCAPTCHA is enabled and configured.
+     * Requires both site key (for frontend) and secret key (for backend).
+     */
+    public function isEnabled(): bool
     {
-        return "captcha_answer_{$context}";
+        $siteKey = config('recaptcha.site_key');
+        $secretKey = config('recaptcha.secret_key');
+
+        // Both keys must be present and non-empty
+        $siteKeyValid = !empty($siteKey) && trim($siteKey) !== '';
+        $secretKeyValid = !empty($secretKey) && trim($secretKey) !== '';
+
+        return $siteKeyValid && $secretKeyValid;
     }
 }
 

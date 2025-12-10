@@ -25,20 +25,27 @@ class MfaChallengeController extends Controller
             return redirect()->route('login');
         }
 
-        $captchaQuestion = $this->captchaService->generate('mfa');
-
-        return view('auth.mfa-challenge', compact('captchaQuestion'));
+        return view('auth.mfa-challenge');
     }
 
     public function verify(Request $request): RedirectResponse
     {
-        $request->validate([
+        $rules = [
             'code' => ['required', 'digits:6'],
-            'captcha_answer' => ['required'],
-        ]);
+        ];
 
-        if (! $this->captchaService->validate($request->input('captcha_answer'), 'mfa')) {
-            return back()->withErrors(['captcha_answer' => 'Incorrect answer to the security question.']);
+        // Only require reCAPTCHA if it's enabled and configured
+        if ($this->captchaService->isEnabled()) {
+            $rules['g-recaptcha-response'] = ['required', 'string'];
+        }
+
+        $request->validate($rules);
+
+        // Validate reCAPTCHA if enabled
+        if ($this->captchaService->isEnabled()) {
+            if (! $this->captchaService->validate($request->input('g-recaptcha-response'), 'mfa')) {
+                return back()->withErrors(['g-recaptcha-response' => 'reCAPTCHA verification failed. Please try again.']);
+            }
         }
 
         $userId = $request->session()->get('mfa_user_id');

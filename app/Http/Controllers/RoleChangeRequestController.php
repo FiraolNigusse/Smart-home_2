@@ -18,6 +18,11 @@ class RoleChangeRequestController extends Controller
 
     public function index()
     {
+        // Owners don't need to request role changes - they should use Review Requests instead
+        if (auth()->user()->isOwner()) {
+            return redirect()->route('role-requests.review');
+        }
+
         $requests = auth()->user()
             ->roleChangeRequests()
             ->with(['requestedRole', 'reviewer'])

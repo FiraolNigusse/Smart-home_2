@@ -13,6 +13,11 @@ use App\Http\Controllers\BiometricCredentialController;
 use App\Http\Controllers\Auth\MfaChallengeController;
 
 Route::middleware('forcehttps')->group(function () {
+    // Temporary debug route - remove after fixing reCAPTCHA
+    Route::get('/debug-recaptcha', function () {
+        return view('debug-recaptcha');
+    })->name('debug.recaptcha');
+    
     Route::get('/', function () {
         return redirect()->route('dashboard');
     });

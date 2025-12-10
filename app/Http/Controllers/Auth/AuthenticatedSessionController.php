@@ -26,9 +26,7 @@ class AuthenticatedSessionController extends Controller
      */
     public function create(): View
     {
-        $captchaQuestion = $this->captchaService->generate('login');
-
-        return view('auth.login', compact('captchaQuestion'));
+        return view('auth.login');
     }
 
     /**
@@ -36,14 +34,17 @@ class AuthenticatedSessionController extends Controller
      */
     public function store(LoginRequest $request): RedirectResponse
     {
-        $request->validate([
-            'captcha_answer' => ['required', 'numeric'],
-        ]);
+        // Validate reCAPTCHA if enabled
+        if ($this->captchaService->isEnabled()) {
+            $request->validate([
+                'g-recaptcha-response' => ['required', 'string'],
+            ]);
 
-        if (! $this->captchaService->validate($request->input('captcha_answer'), 'login')) {
-            return back()
-                ->withErrors(['captcha_answer' => 'Incorrect answer to the security question.'])
-                ->withInput($request->only('email', 'remember'));
+            if (! $this->captchaService->validate($request->input('g-recaptcha-response'), 'login')) {
+                return back()
+                    ->withErrors(['g-recaptcha-response' => 'reCAPTCHA verification failed. Please try again.'])
+                    ->withInput($request->only('email', 'remember'));
+            }
         }
 
         $request->authenticate();

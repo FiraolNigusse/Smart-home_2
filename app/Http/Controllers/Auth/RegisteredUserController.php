@@ -24,9 +24,7 @@ class RegisteredUserController extends Controller
      */
     public function create(): View
     {
-        $captchaQuestion = $this->captchaService->generate('register');
-
-        return view('auth.register', compact('captchaQuestion'));
+        return view('auth.register');
     }
 
     /**
@@ -36,7 +34,7 @@ class RegisteredUserController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        $request->validate([
+        $rules = [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
             'phone' => ['nullable', 'string', 'max:20', 'regex:/^\+?[1-9]\d{1,14}$/'],
@@ -49,13 +47,28 @@ class RegisteredUserController extends Controller
                     ->symbols()
                     ->uncompromised(),
             ],
-            'captcha_answer' => ['required'],
-        ]);
+        ];
 
-        if (! $this->captchaService->validate($request->input('captcha_answer'), 'register')) {
-            return back()
-                ->withErrors(['captcha_answer' => 'Incorrect answer to the security question.'])
-                ->withInput($request->except('password', 'password_confirmation'));
+        // Only require reCAPTCHA if it's enabled and configured
+        if ($this->captchaService->isEnabled()) {
+            $rules['g-recaptcha-response'] = ['required', 'string'];
+        }
+
+        $request->validate($rules);
+
+        // Validate reCAPTCHA if enabled
+        if ($this->captchaService->isEnabled()) {
+            if (! $this->captchaService->validate($request->input('g-recaptcha-response'), 'register')) {
+                return back()
+                    ->withErrors(['g-recaptcha-response' => 'reCAPTCHA verification failed. Please try again.'])
+                    ->withInput($request->except('password', 'password_confirmation'));
+            }
+        }
+
+        // Assign default "Guest" role to new users
+        $guestRole = \App\Models\Role::where('slug', 'guest')->first();
+        if (!$guestRole) {
+            throw new \RuntimeException('Guest role not found. Please run database seeders.');
         }
 
         $user = User::create([
@@ -63,9 +76,13 @@ class RegisteredUserController extends Controller
             'email' => $request->email,
             'phone' => $request->phone,
             'password' => Hash::make($request->password),
+            'role_id' => $guestRole->id,
         ]);
 
         event(new Registered($user));
+
+        // Explicitly send email verification notification
+        $user->sendEmailVerificationNotification();
 
         Auth::login($user);
 

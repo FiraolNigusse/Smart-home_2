@@ -12,15 +12,16 @@
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
         </div>
 
-        <!-- CAPTCHA -->
+        <!-- Google reCAPTCHA -->
+        @php
+            $recaptchaSiteKey = config('recaptcha.site_key', '');
+        @endphp
+        @if(!empty($recaptchaSiteKey))
         <div class="mt-4">
-            <x-input-label for="captcha_answer" :value="$captchaQuestion ?? __('Security Question')" />
-            <x-text-input id="captcha_answer" class="block mt-1 w-full"
-                          type="text"
-                          name="captcha_answer"
-                          required />
-            <x-input-error :messages="$errors->get('captcha_answer')" class="mt-2" />
+            <div class="g-recaptcha" data-sitekey="{{ $recaptchaSiteKey }}"></div>
+            <x-input-error :messages="$errors->get('g-recaptcha-response')" class="mt-2" />
         </div>
+        @endif
 
         <!-- Password -->
         <div class="mt-4">
@@ -54,4 +55,5 @@
             </x-primary-button>
         </div>
     </form>
+
 </x-guest-layout>
