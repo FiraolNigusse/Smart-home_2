@@ -36,14 +36,14 @@ class AuthenticatedSessionController extends Controller
     {
         // Validate reCAPTCHA if enabled
         if ($this->captchaService->isEnabled()) {
-            $request->validate([
+        $request->validate([
                 'g-recaptcha-response' => ['required', 'string'],
-            ]);
+        ]);
 
             if (! $this->captchaService->validate($request->input('g-recaptcha-response'), 'login')) {
-                return back()
+            return back()
                     ->withErrors(['g-recaptcha-response' => 'reCAPTCHA verification failed. Please try again.'])
-                    ->withInput($request->only('email', 'remember'));
+                ->withInput($request->only('email', 'remember'));
             }
         }
 

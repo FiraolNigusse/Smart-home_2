@@ -23,47 +23,56 @@ class SecurityHeaders
             $includeSubDomains = config('security.headers.hsts.include_subdomains', true) ? '; includeSubDomains' : '';
             $preload = config('security.headers.hsts.preload', false) ? '; preload' : '';
             
-            $response->headers->set('Strict-Transport-Security', "max-age={$maxAge}{$includeSubDomains}{$preload}");
+            $value = "max-age={$maxAge}{$includeSubDomains}{$preload}";
+            $response->headers->set('Strict-Transport-Security', $this->sanitizeHeaderValue($value));
         }
 
         // X-Content-Type-Options
         if (config('security.headers.content_type_nosniff', true)) {
-            $response->headers->set('X-Content-Type-Options', 'nosniff');
+            $response->headers->set('X-Content-Type-Options', $this->sanitizeHeaderValue('nosniff'));
         }
 
         // X-Frame-Options
         $frameOptions = config('security.headers.frame_options', 'DENY');
         if ($frameOptions) {
-            $response->headers->set('X-Frame-Options', $frameOptions);
+            $response->headers->set('X-Frame-Options', $this->sanitizeHeaderValue($frameOptions));
         }
 
         // X-XSS-Protection
         if (config('security.headers.xss_protection', true)) {
-            $response->headers->set('X-XSS-Protection', '1; mode=block');
+            $response->headers->set('X-XSS-Protection', $this->sanitizeHeaderValue('1; mode=block'));
         }
 
         // Referrer-Policy
         $referrerPolicy = config('security.headers.referrer_policy', 'strict-origin-when-cross-origin');
         if ($referrerPolicy) {
-            $response->headers->set('Referrer-Policy', $referrerPolicy);
+            $response->headers->set('Referrer-Policy', $this->sanitizeHeaderValue($referrerPolicy));
         }
 
         // Permissions-Policy (formerly Feature-Policy)
         $permissionsPolicy = config('security.headers.permissions_policy');
         if ($permissionsPolicy) {
-            $response->headers->set('Permissions-Policy', $permissionsPolicy);
+            $response->headers->set('Permissions-Policy', $this->sanitizeHeaderValue($permissionsPolicy));
         }
 
         // Content-Security-Policy
         $csp = config('security.headers.content_security_policy');
         if ($csp) {
-            $response->headers->set('Content-Security-Policy', $csp);
+            $response->headers->set('Content-Security-Policy', $this->sanitizeHeaderValue($csp));
         }
 
         // Remove X-Powered-By header
         $response->headers->remove('X-Powered-By');
 
         return $response;
+    }
+
+    /**
+     * Sanitize header values by removing CR and LF characters.
+     */
+    protected function sanitizeHeaderValue(string $value): string
+    {
+        return trim(preg_replace('/[\r\n]+/', ' ', $value));
     }
 }
 

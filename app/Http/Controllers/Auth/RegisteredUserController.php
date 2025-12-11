@@ -59,9 +59,9 @@ class RegisteredUserController extends Controller
         // Validate reCAPTCHA if enabled
         if ($this->captchaService->isEnabled()) {
             if (! $this->captchaService->validate($request->input('g-recaptcha-response'), 'register')) {
-                return back()
+            return back()
                     ->withErrors(['g-recaptcha-response' => 'reCAPTCHA verification failed. Please try again.'])
-                    ->withInput($request->except('password', 'password_confirmation'));
+                ->withInput($request->except('password', 'password_confirmation'));
             }
         }
 
