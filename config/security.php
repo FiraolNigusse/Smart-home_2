@@ -63,13 +63,7 @@ return [
         |--------------------------------------------------------------------------
         */
         'content_security_policy' => env('HEADER_CSP',
-            "default-src 'self';
-            script-src 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com;
-            style-src 'self' 'unsafe-inline' https://fonts.bunny.net https://fonts.googleapis.com;
-            img-src 'self' data: https://www.gstatic.com https://www.google.com;
-            font-src 'self' https://fonts.gstatic.com https://fonts.bunny.net;
-            frame-src https://www.google.com https://www.gstatic.com;
-            connect-src 'self';"
+            "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.bunny.net https://fonts.googleapis.com; img-src 'self' data: https://www.gstatic.com https://www.google.com; font-src 'self' https://fonts.gstatic.com https://fonts.bunny.net; frame-src https://www.google.com https://www.gstatic.com; connect-src 'self';"
         ),
     ],
 ];
